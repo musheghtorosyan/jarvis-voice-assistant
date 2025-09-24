@@ -37,84 +37,62 @@
 <body>
 
 <h1>Voice Recorder Chat</h1>
-<button id="recordButton">🎤 Record</button>
-<button id="stopButton" disabled>⏹ Stop</button>
-<button id="sendButton" disabled>📤 Send</button>
-
+<button id="recordBtn">Record</button>
+<button id="stopBtn" disabled>Stop</button>
 <div id="chatMessages"></div>
 
 <script>
-    const recordButton = document.getElementById('recordButton');
-    const stopButton = document.getElementById('stopButton');
-    const sendButton = document.getElementById('sendButton');
+    const recordBtn = document.getElementById('recordBtn');
+    const stopBtn = document.getElementById('stopBtn');
     const chatMessages = document.getElementById('chatMessages');
 
     let mediaRecorder;
     let recordedChunks = [];
-    let currentBlob;
 
-    recordButton.addEventListener('click', async () => {
+    recordBtn.addEventListener('click', async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             recordedChunks = [];
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+
+            // Проверяем поддержку mimeType
+            let mimeType = 'audio/webm;codecs=opus';
+            if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = '';
+
+            mediaRecorder = new MediaRecorder(stream, { mimeType });
 
             mediaRecorder.ondataavailable = e => {
                 if (e.data.size > 0) recordedChunks.push(e.data);
             };
 
             mediaRecorder.onstop = () => {
-                currentBlob = new Blob(recordedChunks, { type: 'audio/webm' });
-                const audioUrl = URL.createObjectURL(currentBlob);
+                if (recordedChunks.length === 0) {
+                    alert('No audio recorded!');
+                    return;
+                }
+                const blob = new Blob(recordedChunks, { type: mimeType || 'audio/webm' });
+                const url = URL.createObjectURL(blob);
 
-                const audioElement = document.createElement('audio');
-                audioElement.controls = true;
-                audioElement.src = audioUrl;
-                chatMessages.appendChild(audioElement);
-
-                sendButton.disabled = false;
+                const audio = document.createElement('audio');
+                audio.controls = true;
+                audio.src = url;
+                chatMessages.appendChild(audio);
             };
 
             mediaRecorder.start();
-            recordButton.disabled = true;
-            stopButton.disabled = false;
-            sendButton.disabled = true;
+            recordBtn.disabled = true;
+            stopBtn.disabled = false;
         } catch (err) {
-            console.error('Microphone access denied:', err);
-            alert('Microphone access denied');
+            alert('Microphone access denied or error: ' + err);
         }
     });
 
-    stopButton.addEventListener('click', () => {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-        }
-        recordButton.disabled = false;
-        stopButton.disabled = true;
-    });
-
-    sendButton.addEventListener('click', () => {
-        if (!currentBlob) return;
-
-        const formData = new FormData();
-        const filename = 'voice_' + Date.now() + '.webm';
-        formData.append('audio_data', currentBlob, filename);
-
-        fetch('upload.php', { method: 'POST', body: formData })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    console.log('Voice message sent:', data.filePath);
-                    alert('Voice message sent successfully!');
-                    sendButton.disabled = true;
-                } else {
-                    console.error('Failed to send voice message:', data.error);
-                    alert('Failed to send voice message: ' + data.error);
-                }
-            })
-            .catch(console.error);
+    stopBtn.addEventListener('click', () => {
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+        recordBtn.disabled = false;
+        stopBtn.disabled = true;
     });
 </script>
+
 
 </body>
 </html>
