@@ -64,7 +64,7 @@
 
         const formData = new FormData();
         const filename = 'voice_' + new Date().toISOString() + '.webm';
-        formData.append('voiceMessage', currentBlob, filename);
+        formData.append('audio_data', currentBlob, filename);
 
         fetch('upload.php', {
             method: 'POST',
