@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Voice Recorder Chat</title>
+    <title>Voice Recorder with RecordRTC</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -37,68 +37,59 @@
 <body>
 
 <h1>Voice Recorder Chat</h1>
-<button id="recordButton">🎤 Record</button>
-<button id="stopButton" disabled>⏹ Stop</button>
-<button id="sendButton" disabled>📤 Send</button>
+<button id="recordBtn">🎤 Record</button>
+<button id="stopBtn" disabled>⏹ Stop</button>
+<button id="sendBtn" disabled>📤 Send</button>
 
 <div id="chatMessages"></div>
 
+<!-- Подключаем RecordRTC -->
+<script src="https://cdn.webrtc-experiment.com/RecordRTC.js"></script>
+
 <script>
-    const recordButton = document.getElementById('recordButton');
-    const stopButton = document.getElementById('stopButton');
-    const sendButton = document.getElementById('sendButton');
+    let recorder;
+    let blob;
+
+    const recordBtn = document.getElementById('recordBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const sendBtn = document.getElementById('sendBtn');
     const chatMessages = document.getElementById('chatMessages');
 
-    let mediaRecorder;
-    let recordedChunks = [];
-    let currentBlob;
-
-    recordButton.addEventListener('click', async () => {
+    recordBtn.addEventListener('click', async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            recordedChunks = [];
-            mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+            recorder = RecordRTC(stream, { type: 'audio' });
+            recorder.startRecording();
 
-            mediaRecorder.ondataavailable = e => {
-                if (e.data.size > 0) recordedChunks.push(e.data);
-            };
-
-            mediaRecorder.onstop = () => {
-                currentBlob = new Blob(recordedChunks, { type: 'audio/webm' });
-                const audioUrl = URL.createObjectURL(currentBlob);
-
-                const audioElement = document.createElement('audio');
-                audioElement.controls = true;
-                audioElement.src = audioUrl;
-                chatMessages.appendChild(audioElement);
-
-                sendButton.disabled = false;
-            };
-
-            mediaRecorder.start();
-            recordButton.disabled = true;
-            stopButton.disabled = false;
-            sendButton.disabled = true;
+            recordBtn.disabled = true;
+            stopBtn.disabled = false;
+            sendBtn.disabled = true;
         } catch (err) {
-            console.error('Microphone access denied:', err);
-            alert('Microphone access denied');
+            alert('Microphone access denied or error: ' + err);
         }
     });
 
-    stopButton.addEventListener('click', () => {
-        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-            mediaRecorder.stop();
-        }
-        recordButton.disabled = false;
-        stopButton.disabled = true;
+    stopBtn.addEventListener('click', async () => {
+        stopBtn.disabled = true;
+        recordBtn.disabled = false;
+
+        await recorder.stopRecording();
+        blob = recorder.getBlob();
+
+        const audioUrl = URL.createObjectURL(blob);
+        const audio = document.createElement('audio');
+        audio.controls = true;
+        audio.src = audioUrl;
+        chatMessages.appendChild(audio);
+
+        sendBtn.disabled = false;
     });
 
-    sendButton.addEventListener('click', () => {
-        if (!currentBlob) return;
+    sendBtn.addEventListener('click', () => {
+        if (!blob) return;
 
         const formData = new FormData();
-        const filename = 'voice_' + Date.now() + '.webm';
-        formData.append('audio_data', currentBlob, filename);
+        formData.append('audio_data', blob, 'voice_' + Date.now() + '.wav');
 
         fetch('upload.php', { method: 'POST', body: formData })
             .then(res => res.json())
@@ -106,15 +97,13 @@
                 if (data.success) {
                     console.log('Voice message sent:', data.filePath);
                     alert('Voice message sent successfully!');
-                    sendButton.disabled = true;
+                    sendBtn.disabled = true;
                 } else {
-                    console.error('Failed to send voice message:', data.error);
                     alert('Failed to send voice message: ' + data.error);
                 }
             })
             .catch(console.error);
     });
 </script>
-
 </body>
 </html>
