@@ -6,7 +6,8 @@ if (!file_exists($uploadDir)) mkdir($uploadDir, 0777, true);
 
 if (isset($_FILES['audio_data']) && $_FILES['audio_data']['error'] === 0) {
     $input = $_FILES['audio_data']['tmp_name'];
-    $filename = 'voice_' . time() . '.wav';
+    $ext = pathinfo($_FILES['audio_data']['name'], PATHINFO_EXTENSION);
+    $filename = 'voice_' . time() . '.' . $ext;
     $output = $uploadDir . $filename;
 
     if (move_uploaded_file($input, $output)) {

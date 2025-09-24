@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Voice Recorder with RecordRTC</title>
+    <title>Voice Recorder Chat</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -40,9 +40,12 @@
 <button id="recordBtn">🎤 Record</button>
 <button id="stopBtn" disabled>⏹ Stop</button>
 <button id="sendBtn" disabled>📤 Send</button>
+
 <div id="chatMessages"></div>
 
+<!-- Подключаем RecordRTC -->
 <script src="https://cdn.webrtc-experiment.com/RecordRTC.js"></script>
+
 <script>
     let recorder;
     let blob;
@@ -52,19 +55,32 @@
     const sendBtn = document.getElementById('sendBtn');
     const chatMessages = document.getElementById('chatMessages');
 
+    function isMobile() {
+        return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    }
+
     recordBtn.addEventListener('click', async () => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-            // Создаём RecordRTC только после успешного getUserMedia
-            recorder = RecordRTC(stream, { type: 'audio', mimeType: 'audio/wav' });
+            let mimeType;
+            if (isMobile()) {
+                // WAV лучше для мобильных
+                mimeType = 'audio/wav';
+            } else {
+                // WebM + Opus лучше для ПК
+                mimeType = 'audio/webm;codecs=opus';
+                if (!MediaRecorder.isTypeSupported(mimeType)) mimeType = 'audio/webm';
+            }
+
+            recorder = RecordRTC(stream, { type: 'audio', mimeType });
             recorder.startRecording();
 
             recordBtn.disabled = true;
             stopBtn.disabled = false;
             sendBtn.disabled = true;
         } catch (err) {
-            alert('Microphone access denied: ' + err);
+            alert('Microphone access denied or error: ' + err);
         }
     });
 
@@ -77,8 +93,8 @@
         recorder.stopRecording(() => {
             blob = recorder.getBlob();
 
-            if (!blob) {
-                alert('Recording failed, blob is empty');
+            if (!blob || blob.size === 0) {
+                alert('Recording failed: blob is empty');
                 return;
             }
 
@@ -96,7 +112,8 @@
         if (!blob) return;
 
         const formData = new FormData();
-        formData.append('audio_data', blob, 'voice_' + Date.now() + '.wav');
+        let extension = blob.type.includes('wav') ? 'wav' : 'webm';
+        formData.append('audio_data', blob, 'voice_' + Date.now() + '.' + extension);
 
         fetch('upload.php', { method: 'POST', body: formData })
             .then(res => res.json())
